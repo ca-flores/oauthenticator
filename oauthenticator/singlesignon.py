@@ -21,25 +21,21 @@ from traitlets import Unicode
 from .oauth2 import OAuthLoginHandler, OAuthenticator
 
 # Connection to Sigle Sign On server
-"""
 GITHUB_HOST = os.environ.get('GITHUB_HOST') or 'github.com'
 if GITHUB_HOST == 'github.com':
     GITHUB_API = 'api.github.com/user'
 else:
     GITHUB_API = '%s/api/v3/user' % GITHUB_HOST
-"""
+
+AUX_OAUTH_AUTHORIZE_URL = "https://gosec.int.stratio.com:443/cas/oauth2.0/authorize"
+# "https://%s/login/oauth/authorize" % GITHUB_HOST
+AUX_OAUTH_ACCESS_TOKEN_URL = "https://gosec.int.stratio.com:443/gosec-sso/oauth2.0/accessToken"
+# "https://%s/login/oauth/access_token" % GITHUB_HOST
+
 
 class SingleSignOnMixin(OAuth2Mixin):
-    # self.log.warn("...SingleSignOnMixin...")
-    _OAUTH_AUTHORIZE_URL = os.getenv('OAUTH_AUTHORIZE_URL', '')
-    # if not _OAUTH_AUTHORIZE_URL:
-        # self.log.error("OAUTH_AUTHORIZE_URL should be set before to continue")
-        # raise HTTPError(400, "OAUTH_AUTHORIZE_URL has not been set. Check your server configuration")
-    _OAUTH_ACCESS_TOKEN_URL = os.getenv('OAUTH_ACCESS_TOKEN_URL', '')
-    # if not _OAUTH_ACCESS_TOKEN_URL:
-        # self.log.error("OAUTH_ACCESS_TOKEN_URL should be set before to continue")
-        # raise HTTPError(400, "OAUTH_ACCESS_TOKEN_URL has not been set. Check your server configuration")
-    # self.log.warn("---SingleSignOnMixin---")
+    _OAUTH_AUTHORIZE_URL = os.getenv('OAUTH_AUTHORIZE_URL', AUX_OAUTH_AUTHORIZE_URL)
+    _OAUTH_ACCESS_TOKEN_URL = os.getenv('OAUTH_ACCESS_TOKEN_URL', AUX_OAUTH_ACCESS_TOKEN_URL)
 
 class SingleSignOnLoginHandler(OAuthLoginHandler, SingleSignOnMixin):
     pass
@@ -47,19 +43,6 @@ class SingleSignOnLoginHandler(OAuthLoginHandler, SingleSignOnMixin):
 class SingleSignOnOAuthenticator(OAuthenticator):
     # self.log.warn("...SingleSignOnOAuthenticator...")
     login_service = "SingleSignOn"
-    """
-    # deprecated names
-    github_client_id = Unicode(config=True, help="DEPRECATED")
-    def _github_client_id_changed(self, name, old, new):
-        self.log.warn("github_client_id is deprecated, use client_id")
-        self.client_id = new
-    github_client_secret = Unicode(config=True, help="DEPRECATED")
-    def _github_client_secret_changed(self, name, old, new):
-        self.log.warn("github_client_secret is deprecated, use client_secret")
-        self.client_secret = new
-    """
-
-    client_id_env = 'SINGLESIGNON_CLIENT_ID'
     client_secret_env = 'SINGLESIGNON_CLIENT_SECRET'
     login_handler = SingleSignOnLoginHandler
 
@@ -82,21 +65,9 @@ class SingleSignOnOAuthenticator(OAuthenticator):
             client_secret=self.client_secret,
             code=code
         )
-        """
-        url = url_concat("https://%s/login/oauth/access_token" % GITHUB_HOST,
-                         params)
-        """
 
-        OAUTH_AUTHORIZE_URL = os.getenv('OAUTH_AUTHORIZE_URL', '')
-        if not OAUTH_AUTHORIZE_URL:
-            self.log.error("OAUTH_AUTHORIZE_URL should be set before to continue")
-            raise HTTPError(400, "OAUTH_AUTHORIZE_URL has not been set. Check your server configuration")
-        OAUTH_ACCESS_TOKEN_URL = os.getenv('OAUTH_ACCESS_TOKEN_URL', '')
-        if not OAUTH_ACCESS_TOKEN_URL:
-            self.log.error("OAUTH_ACCESS_TOKEN_URL should be set before to continue")
-            raise HTTPError(400, "OAUTH_ACCESS_TOKEN_URL has not been set. Check your server configuration")
 
-        url = OAUTH_ACCESS_TOKEN_URL
+        url = _OAUTH_ACCESS_TOKEN_URL
         req = HTTPRequest(url,
                           method="POST",
                           headers={"Accept": "application/json"},
