@@ -14,18 +14,13 @@ from tornado import gen, web
 from tornado.httputil import url_concat
 from tornado.httpclient import HTTPRequest, AsyncHTTPClient
 
+from jupyterhub.utils import url_path_join
 from jupyterhub.auth import LocalAuthenticator
+from jupyterhub.handlers import BaseHandler
 
 from traitlets import Unicode
 
 from .oauth2 import OAuthLoginHandler, OAuthenticator
-
-# Connection to Sigle Sign On server
-GITHUB_HOST = os.environ.get('GITHUB_HOST') or 'github.com'
-if GITHUB_HOST == 'github.com':
-    GITHUB_API = 'api.github.com/user'
-else:
-    GITHUB_API = '%s/api/v3/user' % GITHUB_HOST
 
 AUX_OAUTH_AUTHORIZE_URL = "https://gosec.int.stratio.com/gosec-sso/oauth2.0/authorize"
 # AUX_OAUTH_AUTHORIZE_URL = "https://%s/login/oauth/authorize" % GITHUB_HOST
@@ -40,12 +35,55 @@ class SingleSignOnMixin(OAuth2Mixin):
 class SingleSignOnLoginHandler(OAuthLoginHandler, SingleSignOnMixin):
     pass
 
+class SingleSignOnLogoutHandler(BaseHandler):
+    """Class for OAuth logout handler"""
+    oauth_logout_url = Unicode(
+        os.getenv('OAUTH_LOGOUT_URL', 'https://gosec.int.stratio.com/gosec-sso/logout'),
+        config=True,
+        help="""Logout URL to use.
+        Typically `https://{host}/hub/logout
+        `"""
+    )
+    @gen.coroutine
+    def get(self):
+        self.log.info("SingleSignOnLogoutHandler----")
+
+        self.log.debug("oauth_logout to be called----")
+        http_client = AsyncHTTPClient()
+        req =  HTTPRequest(url='https://gosec.int.stratio.com/gosec-sso/logout',
+                          method="GET",
+                          headers={"Accept": "application/json"}
+                          )
+        resp = yield http_client.fetch(req)
+        decoded = resp.body.decode()
+        # self.log.info(decoded)
+        user = self.get_current_user()
+        if user:
+            self.log.info("User logged out: %s", user.name)
+            self.clear_login_cookie()
+            for name in user.other_user_cookies:
+                self.clear_login_cookie(name)
+            user.other_user_cookies = set([])
+            # self.statsd.incr('logout')
+        self.redirect(self.hub.server.base_url, permanent=False)
+
+
 class SingleSignOnOAuthenticator(OAuthenticator):
-    # self.log.warn("...SingleSignOnOAuthenticator...")
+    """
+    Custom Authenticator for custom OAuth server
+    """
     login_service = "SingleSignOn"
     client_secret_env = 'SINGLESIGNON_CLIENT_SECRET'
     login_handler = SingleSignOnLoginHandler
-
+    logout_handler = SingleSignOnLogoutHandler
+    oauth_logout_url = Unicode(
+        os.getenv('OAUTH_LOGOUT_URL', 'https://gosec.int.stratio.com/gosec-sso/logout'),
+        config=True,
+        help="""Logout URL to use.
+        Typically `https://{host}/hub/logout
+        `"""
+    )
+    grant_type = Unicode(config=True)
     @gen.coroutine
     def authenticate(self, handler, data=None):
         self.log.warn("...authenticate...")
@@ -60,12 +98,14 @@ class SingleSignOnOAuthenticator(OAuthenticator):
         # See: https://developer.github.com/v3/oauth/
 
         # GitHub specifies a POST request yet requires URL parameters
-        aux_grant_type = "authorization_code"
+
+        # aux_grant_type = "authorization_code"
+        # "https://intelligence-dev:8000/hub/oauth_callback",
         params = dict(
             client_id=self.client_id,
             client_secret=self.client_secret,
-            grant_type=aux_grant_type,
-            redirect_uri="https://intelligence-dev:8000/hub/oauth_callback",
+            grant_type=self.grant_type,
+            redirect_uri=self.oauth_callback_url,
             code=code
         )
 
