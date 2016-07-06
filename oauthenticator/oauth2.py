@@ -77,6 +77,15 @@ class OAuthenticator(Authenticator):
         Typically `https://{host}/hub/oauth_callback`"""
     )
 
+    oauth_logout_url = Unicode(
+        config=True,
+        help="""Logout URL to use.
+        Typically `https://{host}/hub/logout
+        `"""
+    )
+    oauth_profile_url = Unicode(config=True)
+    grant_type = Unicode(config=True)
+
     client_id_env = 'OAUTH_CLIENT_ID'
     client_id = Unicode(config=True)
     def _client_id_default(self):

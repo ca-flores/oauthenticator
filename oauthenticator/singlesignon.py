@@ -7,6 +7,7 @@ Most of the code c/o Kyle Kelley (@rgbkrk)
 
 import json
 import os
+import sys
 
 from tornado.auth import OAuth2Mixin
 from tornado import gen, web
@@ -30,24 +31,18 @@ AUX_OAUTH_LOGOUT_URL = "https://gosec.int.stratio.com/gosec-sso/logout"
 
 
 class SingleSignOnMixin(OAuth2Mixin):
-    _OAUTH_AUTHORIZE_URL = os.getenv('OAUTH_AUTHORIZE_URL', AUX_OAUTH_AUTHORIZE_URL)
-    _OAUTH_ACCESS_TOKEN_URL = os.getenv('OAUTH_ACCESS_TOKEN_URL', AUX_OAUTH_ACCESS_TOKEN_URL)
+    _OAUTH_AUTHORIZE_URL = AUX_OAUTH_AUTHORIZE_URL
+    _OAUTH_ACCESS_TOKEN_URL = AUX_OAUTH_ACCESS_TOKEN_URL
 
 class SingleSignOnLoginHandler(OAuthLoginHandler, SingleSignOnMixin):
     pass
 
-class SingleSignOnLogoutHandler(BaseHandler, OAuthenticator):
+class SingleSignOnLogoutHandler(BaseHandler):
     """Class for OAuth logout handler"""
 
     @gen.coroutine
     def get(self):
         http_client = AsyncHTTPClient()
-        req =  HTTPRequest(url=self.oauth_logout_url,
-                          method="GET",
-                          headers={"Accept": "application/json"}
-                          )
-        resp = yield http_client.fetch(req)
-        decoded = resp.body.decode()
         user = self.get_current_user()
         if user:
             self.log.info("User logged out: %s", user.name)
@@ -55,7 +50,7 @@ class SingleSignOnLogoutHandler(BaseHandler, OAuthenticator):
             for name in user.other_user_cookies:
                 self.clear_login_cookie(name)
             user.other_user_cookies = set([])
-        self.redirect(self.hub.server.base_url, permanent=False)
+        self.redirect(AUX_OAUTH_LOGOUT_URL, permanent=False)
 
 
 class SingleSignOnOAuthenticator(OAuthenticator):
@@ -66,14 +61,6 @@ class SingleSignOnOAuthenticator(OAuthenticator):
     client_secret_env = 'SINGLESIGNON_CLIENT_SECRET'
     login_handler = SingleSignOnLoginHandler
     logout_handler = SingleSignOnLogoutHandler
-    oauth_logout_url = Unicode(
-        os.getenv('OAUTH_LOGOUT_URL', AUX_OAUTH_LOGOUT_URL),
-        config=True,
-        help="""Logout URL to use.
-        Typically `https://{host}/hub/logout
-        `"""
-    )
-    grant_type = Unicode(config=True)
     @gen.coroutine
     def authenticate(self, handler, data=None):
         self.log.info("SingleSignOnOAuthenticator...authenticate...")
@@ -85,7 +72,7 @@ class SingleSignOnOAuthenticator(OAuthenticator):
 
         # Exchange the OAuth code for a Custom OAuth Access Token
         # API specifies a GET request yet requires URL parameters
-        params = dict(
+        token_req_param = dict(
             client_id=self.client_id,
             client_secret=self.client_secret,
             grant_type=self.grant_type,
@@ -93,36 +80,37 @@ class SingleSignOnOAuthenticator(OAuthenticator):
             code=code
         )
 
-        url = os.getenv('OAUTH_ACCESS_TOKEN_URL', '')
-        if not url:
+        if not AUX_OAUTH_ACCESS_TOKEN_URL:
             raise web.HTTPError(400, "OAUTH_ACCESS_TOKEN_URL is not defined")
 
-        url = url_concat(url, params)
-        req = HTTPRequest(url=url,
+        token_url = url_concat(AUX_OAUTH_ACCESS_TOKEN_URL, token_req_param)
+        token_req = HTTPRequest(url=token_url,
                           method="GET",
                           headers={"Accept": "application/json"}
                           )
 
-        resp = yield http_client.fetch(req)
+        resp = yield http_client.fetch(token_req)
         # Parse fetch response, in this case fetch returns a string
         # that is processed to convert it to JSON string format
         # We retrieve a valid token and an extra param that is expired
         body_str = resp.body.decode('utf8', 'replace')
-        body_str = body.replace("=", "\":\"")
-        body_str = body.replace("&", "\",\"")
-        json_str = "{\""+body+"\"}"
+        body_str = body_str.replace("=", "\":\"")
+        body_str = body_str.replace("&", "\",\"")
+        json_str = "{\""+body_str+"\"}"
         self.log.debug("Response valid token: %s" % json_str)
         # Parse json_str to json object
         resp_json = json.loads(json_str)
 
-        params = yield dict(
+        profile_req_params = dict(
             access_token=resp_json['access_token']
         )
         # Retrieve user information with a valid token obtained from the previous
         # request
-        url_profile = url_concat(AUX_OAUTH_PROFILE_URL, params)
-        req = HTTPRequest(aux_url)
-        resp = yield http_client.fetch(req)
+        if not AUX_OAUTH_PROFILE_URL:
+            raise web.HTTPError(400, "OAUTH_PROFILE_URL is not defined")
+        profile_url = url_concat(AUX_OAUTH_PROFILE_URL, profile_req_params)
+        profile_req = HTTPRequest(profile_url)
+        resp = yield http_client.fetch(profile_req)
         resp_json = json.loads(resp.body.decode('utf8', 'replace'))
         # This request returns a JSON string
         self.log.info("OAuth user id: %s" % resp_json['id'])
