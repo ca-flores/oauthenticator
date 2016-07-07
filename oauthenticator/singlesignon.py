@@ -50,6 +50,9 @@ class SingleSignOnLogoutHandler(BaseHandler):
             for name in user.other_user_cookies:
                 self.clear_login_cookie(name)
             user.other_user_cookies = set([])
+        # Stratio Intelligence Modification
+        # Stop_single_user added in Sprint 7 in order to stop container in logout
+        self.stop_single_user(user)
         self.redirect(AUX_OAUTH_LOGOUT_URL, permanent=False)
 
 
@@ -67,7 +70,7 @@ class SingleSignOnOAuthenticator(OAuthenticator):
         code = handler.get_argument("code", False)
         if not code:
             raise web.HTTPError(400, "oauth callback made without a token")
-        # TODO: Configure the curl_httpclient for tornado
+
         http_client = AsyncHTTPClient()
 
         # Exchange the OAuth code for a Custom OAuth Access Token
@@ -92,7 +95,7 @@ class SingleSignOnOAuthenticator(OAuthenticator):
         resp = yield http_client.fetch(token_req)
         # Parse fetch response, in this case fetch returns a string
         # that is processed to convert it to JSON string format
-        # We retrieve a valid token and an extra param that is expired
+        # We retrieve a valid token and an extra param that is called "expired"
         body_str = resp.body.decode('utf8', 'replace')
         body_str = body_str.replace("=", "\":\"")
         body_str = body_str.replace("&", "\",\"")

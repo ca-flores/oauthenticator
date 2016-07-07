@@ -100,7 +100,7 @@ class OAuthenticator(Authenticator):
         return url_path_join(base_url, 'oauth_login')
 
     def logout_url(self, base_url):
-        return url_path_join(base_url, 'oauth_logout')
+        return url_path_join(base_url, 'logout')
 
     login_handler = "Specify login handler class in subclass"
     logout_handler = "Specify logout handler class in subclass"
@@ -109,8 +109,7 @@ class OAuthenticator(Authenticator):
     def get_handlers(self, app):
         return [
             (r'/oauth_login', self.login_handler),
-            (r'/hub/logout', self.logout_handler),
-            (r'/oauth_logout', self.logout_handler),
+            (r"/logout", self.logout_handler),
             (r'/oauth_callback', self.callback_handler),
         ]
 
