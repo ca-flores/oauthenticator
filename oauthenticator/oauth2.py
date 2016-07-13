@@ -100,7 +100,6 @@ class OAuthenticator(Authenticator):
     oauth_authorize_url = Unicode(config=True)
     oauth_access_token_url = Unicode(config=True)
     oauth_callback_url = Unicode(
-        os.getenv('OAUTH_CALLBACK_URL', ''),
         config=True,
         help="""Callback URL to use.
         Typically `https://{host}/hub/oauth_callback`"""
