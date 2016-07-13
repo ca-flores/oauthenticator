@@ -7,8 +7,8 @@ Most of the code c/o Kyle Kelley (@rgbkrk)
 
 import json
 import os
-import sys
 
+from tornado.concurrent import return_future
 from tornado.auth import OAuth2Mixin
 from tornado import gen, web
 
@@ -21,40 +21,20 @@ from jupyterhub.handlers import BaseHandler
 
 from traitlets import Unicode
 
-from .oauth2 import OAuthLoginHandler, OAuthenticator
-
-# Looking for urls that have been set as Environment Variables
-AUX_OAUTH_AUTHORIZE_URL = "https://gosec.int.stratio.com/gosec-sso/oauth2.0/authorize"
-AUX_OAUTH_ACCESS_TOKEN_URL = "https://gosec.int.stratio.com/gosec-sso/oauth2.0/accessToken"
-AUX_OAUTH_PROFILE_URL = "https://gosec.int.stratio.com/gosec-sso/oauth2.0/profile"
-AUX_OAUTH_LOGOUT_URL = "https://gosec.int.stratio.com/gosec-sso/logout"
+from .oauth2 import OAuthLoginHandler, OAuthLogoutHandler, OAuthenticator
 
 
 class SingleSignOnMixin(OAuth2Mixin):
-    _OAUTH_AUTHORIZE_URL = AUX_OAUTH_AUTHORIZE_URL
-    _OAUTH_ACCESS_TOKEN_URL = AUX_OAUTH_ACCESS_TOKEN_URL
+    
+    def set_oauth_urls(self, oauth_authorize_url = None, oauth_access_token_url=None):
+        self._OAUTH_AUTHORIZE_URL = oauth_authorize_url
+        self._OAUTH_ACCESS_TOKEN_URL = oauth_access_token_url
 
 class SingleSignOnLoginHandler(OAuthLoginHandler, SingleSignOnMixin):
     pass
 
-class SingleSignOnLogoutHandler(BaseHandler):
-    """Class for OAuth logout handler"""
-
-    @gen.coroutine
-    def get(self):
-        http_client = AsyncHTTPClient()
-        user = self.get_current_user()
-        if user:
-            self.log.info("User logged out: %s", user.name)
-            self.clear_login_cookie()
-            for name in user.other_user_cookies:
-                self.clear_login_cookie(name)
-            user.other_user_cookies = set([])
-        # Stratio Intelligence Modification
-        # Stop_single_user added in Sprint 7 in order to stop container in logout
-        self.stop_single_user(user)
-        self.redirect(AUX_OAUTH_LOGOUT_URL, permanent=False)
-
+class SingleSignOnLogoutHandler(OAuthLogoutHandler):
+    pass
 
 class SingleSignOnOAuthenticator(OAuthenticator):
     """
@@ -66,10 +46,10 @@ class SingleSignOnOAuthenticator(OAuthenticator):
     logout_handler = SingleSignOnLogoutHandler
     @gen.coroutine
     def authenticate(self, handler, data=None):
-        self.log.info("SingleSignOnOAuthenticator...authenticate...")
+
         code = handler.get_argument("code", False)
         if not code:
-            raise web.HTTPError(400, "oauth callback made without a token")
+            raise web.HTTPError(400, "OAUTH_CALLBACK_URL has been called without a token")
 
         http_client = AsyncHTTPClient()
 
@@ -83,10 +63,10 @@ class SingleSignOnOAuthenticator(OAuthenticator):
             code=code
         )
 
-        if not AUX_OAUTH_ACCESS_TOKEN_URL:
+        if not self.oauth_access_token_url:
             raise web.HTTPError(400, "OAUTH_ACCESS_TOKEN_URL is not defined")
 
-        token_url = url_concat(AUX_OAUTH_ACCESS_TOKEN_URL, token_req_param)
+        token_url = url_concat(self.oauth_access_token_url, token_req_param)
         token_req = HTTPRequest(url=token_url,
                           method="GET",
                           headers={"Accept": "application/json"}
@@ -109,9 +89,9 @@ class SingleSignOnOAuthenticator(OAuthenticator):
         )
         # Retrieve user information with a valid token obtained from the previous
         # request
-        if not AUX_OAUTH_PROFILE_URL:
+        if not self.oauth_profile_url:
             raise web.HTTPError(400, "OAUTH_PROFILE_URL is not defined")
-        profile_url = url_concat(AUX_OAUTH_PROFILE_URL, profile_req_params)
+        profile_url = url_concat(self.oauth_profile_url, profile_req_params)
         profile_req = HTTPRequest(profile_url)
         resp = yield http_client.fetch(profile_req)
         resp_json = json.loads(resp.body.decode('utf8', 'replace'))

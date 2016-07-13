@@ -6,12 +6,15 @@ Most of the code c/o Kyle Kelley (@rgbkrk)
 
 
 import os
+import subprocess
 
 from tornado import gen, web
 
 from jupyterhub.handlers import BaseHandler
 from jupyterhub.auth import Authenticator
 from jupyterhub.utils import url_path_join
+
+from tornado.httpclient import AsyncHTTPClient
 
 from traitlets import Unicode
 
@@ -36,11 +39,34 @@ class OAuthLoginHandler(BaseHandler):
         redirect_uri = self.authenticator.oauth_callback_url or guess_uri
         self.log.info('oauth redirect: %r', redirect_uri)
 
+        self.set_oauth_urls(
+            oauth_authorize_url=self.authenticator.oauth_authorize_url,
+            oauth_access_token_url=self.authenticator.oauth_access_token_url)
+
         self.authorize_redirect(
             redirect_uri=redirect_uri,
             client_id=self.authenticator.client_id,
             scope=self.scope,
             response_type='code')
+
+class OAuthLogoutHandler(BaseHandler):
+    """Class for OAuth logout handler"""
+
+    @gen.coroutine
+    def get(self):
+        http_client = AsyncHTTPClient()
+        user = self.get_current_user()
+        if user:
+            self.log.info("User logged out: %s", user.name)
+            self.clear_login_cookie()
+            for name in user.other_user_cookies:
+                self.clear_login_cookie(name)
+            user.other_user_cookies = set([])
+        # Stratio Intelligence Modification
+        # Stop_single_user added in Sprint 7 in order to stop container in logout
+        self.stop_single_user(user)
+        self.redirect(self.authenticator.oauth_logout_url, permanent=False)
+
 
 
 class OAuthCallbackHandler(BaseHandler):
@@ -70,6 +96,9 @@ class OAuthenticator(Authenticator):
     """
 
     login_service = 'override in subclass'
+    
+    oauth_authorize_url = Unicode(config=True)
+    oauth_access_token_url = Unicode(config=True)
     oauth_callback_url = Unicode(
         os.getenv('OAUTH_CALLBACK_URL', ''),
         config=True,
@@ -85,6 +114,7 @@ class OAuthenticator(Authenticator):
     )
     oauth_profile_url = Unicode(config=True)
     grant_type = Unicode(config=True)
+
 
     client_id_env = 'OAUTH_CLIENT_ID'
     client_id = Unicode(config=True)
