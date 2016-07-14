@@ -103,7 +103,7 @@ class SingleSignOnOAuthenticator(OAuthenticator):
 
         resp = yield http_client.fetch(token_req)
         
-        parse_response = self.parse_response(resp)
+        resp_json = self.parse_response(resp)
 
         profile_req_params = dict(
             access_token=resp_json['access_token']
