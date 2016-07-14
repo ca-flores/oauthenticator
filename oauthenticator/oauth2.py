@@ -50,24 +50,7 @@ class OAuthLoginHandler(BaseHandler):
             response_type='code')
 
 class OAuthLogoutHandler(BaseHandler):
-    """Class for OAuth logout handler"""
-
-    @gen.coroutine
-    def get(self):
-        http_client = AsyncHTTPClient()
-        user = self.get_current_user()
-        if user:
-            self.log.info("User logged out: %s", user.name)
-            self.clear_login_cookie()
-            for name in user.other_user_cookies:
-                self.clear_login_cookie(name)
-            user.other_user_cookies = set([])
-        # Stratio Intelligence Modification
-        # Stop_single_user added in Sprint 7 in order to stop container in logout
-        self.stop_single_user(user)
-        self.redirect(self.authenticator.oauth_logout_url, permanent=False)
-
-
+    pass
 
 class OAuthCallbackHandler(BaseHandler):
     """Basic handler for OAuth callback. Calls authenticator to verify username."""
@@ -141,6 +124,15 @@ class OAuthenticator(Authenticator):
             (r"/logout", self.logout_handler),
             (r'/oauth_callback', self.callback_handler),
         ]
+
+    
+    def parse_response(self, response):
+        """ 
+        Input: response of oauth service. It contains a valid token 
+        Ouput: parsed response in json or any other valid format 
+            for the current authenticator
+        """
+        raise NotImplementedError()
 
     @gen.coroutine
     def authenticate(self, handler, data=None):

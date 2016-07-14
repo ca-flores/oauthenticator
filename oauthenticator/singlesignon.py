@@ -34,7 +34,22 @@ class SingleSignOnLoginHandler(OAuthLoginHandler, SingleSignOnMixin):
     pass
 
 class SingleSignOnLogoutHandler(OAuthLogoutHandler):
-    pass
+    
+    """ Class for OAuth logout handler """
+    @gen.coroutine
+    def get(self):
+        http_client = AsyncHTTPClient()
+        user = self.get_current_user()
+        if user:
+            self.log.info("User logged out: %s", user.name)
+            self.clear_login_cookie()
+            for name in user.other_user_cookies:
+                self.clear_login_cookie(name)
+            user.other_user_cookies = set([])
+        # Stratio Intelligence Modification
+        # Stop_single_user added in Sprint 7 in order to stop container in logout
+        self.stop_single_user(user)
+        self.redirect(self.authenticator.oauth_logout_url, permanent=False)
 
 class SingleSignOnOAuthenticator(OAuthenticator):
     """
@@ -44,6 +59,20 @@ class SingleSignOnOAuthenticator(OAuthenticator):
     client_secret_env = 'SINGLESIGNON_CLIENT_SECRET'
     login_handler = SingleSignOnLoginHandler
     logout_handler = SingleSignOnLogoutHandler
+
+
+    def parse_response(self, response):
+        # Parse fetch response, in this case fetch returns a string
+        # that is processed to convert it to JSON string format
+        # We retrieve a valid token and an extra param that is called "expired"
+        body_str = response.body.decode('utf8', 'replace')
+        body_str = body_str.replace("=", "\":\"")
+        body_str = body_str.replace("&", "\",\"")
+        json_str = "{\""+body_str+"\"}"
+        self.log.debug("Response valid token: %s" % json_str)
+        # Parse json_str to json object
+        return json.loads(json_str)
+
     @gen.coroutine
     def authenticate(self, handler, data=None):
 
@@ -73,16 +102,8 @@ class SingleSignOnOAuthenticator(OAuthenticator):
                           )
 
         resp = yield http_client.fetch(token_req)
-        # Parse fetch response, in this case fetch returns a string
-        # that is processed to convert it to JSON string format
-        # We retrieve a valid token and an extra param that is called "expired"
-        body_str = resp.body.decode('utf8', 'replace')
-        body_str = body_str.replace("=", "\":\"")
-        body_str = body_str.replace("&", "\",\"")
-        json_str = "{\""+body_str+"\"}"
-        self.log.debug("Response valid token: %s" % json_str)
-        # Parse json_str to json object
-        resp_json = json.loads(json_str)
+        
+        parse_response = self.parse_response(resp)
 
         profile_req_params = dict(
             access_token=resp_json['access_token']
