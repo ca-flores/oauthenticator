@@ -81,41 +81,41 @@ class OAuthenticator(Authenticator):
     login_service = 'override in subclass'
     
     oauth_authorize_url = Unicode(
-        None, 
+        '',
         config=True,
         help="""URL to authorize user who is loging in.
         Typically `https://ssso.server.com/gosec-sso/oauth2.0/authorize`"""
     )
     oauth_access_token_url = Unicode(
-        None, 
-        config=True
+        '',
+        config=True,
         help="""URL to retrieve valid token for an user.
         Typically `https://ssso.server.com/gosec-sso/oauth2.0/accessToken`"""
     )
     oauth_callback_url = Unicode(
-        None,
+        '',
         config=True,
         help="""Callback URL to use.
         Typically `https://{host}/hub/oauth_callback`"""
     )
     oauth_logout_url = Unicode(
-        None,
+        '',
         config=True,
         help="""Logout URL to use to logout from OAuth server.
         Typically `https://ssso.server.com/gosec-sso/logout`"""
     )
     oauth_profile_url = Unicode(
-        None, 
+        '',
         config=True,
         help="""URL to use to retrieve user information.
         Tipycally `https://ssso.server.com/gosec-sso/oauth2.0/profile`"""
     )
-    client_secret = Unicode(None, config=True)
-    client_id = Unicode(None, config=True)
-    grant_type = Unicode(None, config=True)
+    client_secret = Unicode('', config=True)
+    client_id = Unicode('', config=True)
+    grant_type = Unicode('', config=True)
 
     client_cert_path = Unicode(
-        None,
+        '',
         config=True,
         help="""PEM file path to make secure the comunication between servers"""
     )
