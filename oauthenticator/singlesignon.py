@@ -98,7 +98,9 @@ class SingleSignOnOAuthenticator(OAuthenticator):
         token_url = url_concat(self.oauth_access_token_url, token_req_param)
         token_req = HTTPRequest(url=token_url,
                           method="GET",
-                          headers={"Accept": "application/json"}
+                          headers={"Accept": "application/json"},
+                          validate_cert=True,
+                          ca_certs=self.client_cert_path
                           )
 
         resp = yield http_client.fetch(token_req)
@@ -113,7 +115,10 @@ class SingleSignOnOAuthenticator(OAuthenticator):
         if not self.oauth_profile_url:
             raise web.HTTPError(400, "OAUTH_PROFILE_URL is not defined")
         profile_url = url_concat(self.oauth_profile_url, profile_req_params)
-        profile_req = HTTPRequest(profile_url)
+        profile_req = HTTPRequest(
+                          url=profile_url,
+                          validate_cert=True,
+                          ca_certs=self.client_cert_path)
         resp = yield http_client.fetch(profile_req)
         resp_json = json.loads(resp.body.decode('utf8', 'replace'))
         # This request returns a JSON string

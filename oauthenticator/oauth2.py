@@ -80,31 +80,51 @@ class OAuthenticator(Authenticator):
 
     login_service = 'override in subclass'
     
-    oauth_authorize_url = Unicode(config=True)
-    oauth_access_token_url = Unicode(config=True)
+    oauth_authorize_url = Unicode(
+        None, 
+        config=True,
+        help="""URL to authorize user who is loging in.
+        Typically `https://ssso.server.com/gosec-sso/oauth2.0/authorize`"""
+    )
+    oauth_access_token_url = Unicode(
+        None, 
+        config=True
+        help="""URL to retrieve valid token for an user.
+        Typically `https://ssso.server.com/gosec-sso/oauth2.0/accessToken`"""
+    )
     oauth_callback_url = Unicode(
+        None,
         config=True,
         help="""Callback URL to use.
         Typically `https://{host}/hub/oauth_callback`"""
     )
-
     oauth_logout_url = Unicode(
+        None,
         config=True,
-        help="""Logout URL to use.
-        Typically `https://{host}/hub/logout
-        `"""
+        help="""Logout URL to use to logout from OAuth server.
+        Typically `https://ssso.server.com/gosec-sso/logout`"""
     )
-    oauth_profile_url = Unicode(config=True)
-    grant_type = Unicode(config=True)
+    oauth_profile_url = Unicode(
+        None, 
+        config=True,
+        help="""URL to use to retrieve user information.
+        Tipycally `https://ssso.server.com/gosec-sso/oauth2.0/profile`"""
+    )
+    client_secret = Unicode(None, config=True)
+    client_id = Unicode(None, config=True)
+    grant_type = Unicode(None, config=True)
 
+    client_cert_path = Unicode(
+        None,
+        config=True,
+        help="""PEM file path to make secure the comunication between servers"""
+    )
 
     client_id_env = 'OAUTH_CLIENT_ID'
-    client_id = Unicode(config=True)
     def _client_id_default(self):
         return os.getenv(self.client_id_env, '')
 
     client_secret_env = 'OAUTH_CLIENT_SECRET'
-    client_secret = Unicode(config=True)
     def _client_secret_default(self):
         return os.getenv(self.client_secret_env, '')
 
