@@ -110,6 +110,14 @@ class OAuthenticator(Authenticator):
         help="""URL to use to retrieve user information.
         Tipycally `https://ssso.server.com/gosec-sso/oauth2.0/profile`"""
     )
+    oauth_allowed_group = Unicode(
+        '',
+        config=True,
+        help="""Define whether user is allowed or not to access to application""")
+    permissions_object_key = Unicode(
+        '',
+        config=True,
+        help="""Key to retrieve object that contains list of user roles""")
     client_secret = Unicode('', config=True)
     client_id = Unicode('', config=True)
     grant_type = Unicode('', config=True)

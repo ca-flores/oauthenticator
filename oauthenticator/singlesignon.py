@@ -60,6 +60,8 @@ class SingleSignOnOAuthenticator(OAuthenticator):
     login_handler = SingleSignOnLoginHandler
     logout_handler = SingleSignOnLogoutHandler
 
+    # The following function assumes that there is just one single object with the 'key'
+    get_object = lambda obj_list, key: obj for obj in obj_list if key in obj
 
     def parse_response(self, response):
         # Parse fetch response, in this case fetch returns a string
@@ -72,6 +74,15 @@ class SingleSignOnOAuthenticator(OAuthenticator):
         self.log.debug("Response valid token: %s" % json_str)
         # Parse json_str to json object
         return json.loads(json_str)
+
+    def is_authorized(self, credentials):
+        # Check whether user is assigned to the allowed group
+        key = self.permissions_object_key
+        allowed_group = self.oauth_allowed_group
+        roles_object = get_object(credentials.attributes, key)
+        if self.oauth_allowed_group in roles_object.key:
+            return True
+        else return False
 
     @gen.coroutine
     def authenticate(self, handler, data=None):
@@ -123,6 +134,8 @@ class SingleSignOnOAuthenticator(OAuthenticator):
         resp_json = json.loads(resp.body.decode('utf8', 'replace'))
         # This request returns a JSON string
         self.log.info("OAuth user id: %s" % resp_json['id'])
+        if not is_authorized(self, resp_json):
+            raise web.HTTPError(403, "User is not allowed to access to Stratio Intelligence")
         # User id is returned to be registered into app data base
         return resp_json['id']
 
